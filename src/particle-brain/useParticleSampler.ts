@@ -51,6 +51,23 @@ export function useParticleSampler(
       );
     }
 
+    // The model's own pivot (e.g. at its feet, not its visual center) is
+    // irrelevant to us — recenter on the bounding-box center so the particle
+    // cloud is centered at the origin, matching the camera's fixed look-at
+    // target regardless of how the source asset was authored.
+    merged.center();
+
+    // Source assets can be authored at any real-world scale. Normalize so
+    // the model's bounding sphere always has the same on-screen radius,
+    // regardless of the source GLB's units — this keeps sizing consistent
+    // when `modelUrl` is swapped for a different model later.
+    merged.computeBoundingSphere();
+    const sourceRadius = merged.boundingSphere?.radius ?? 1;
+    const targetRadius = 1;
+    if (sourceRadius > 0) {
+      merged.scale(targetRadius / sourceRadius, targetRadius / sourceRadius, targetRadius / sourceRadius);
+    }
+
     return sampleParticles(merged, { count: particleCount, colors });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gltf, modelUrl, particleCount, colorsKey]);
