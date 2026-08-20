@@ -11,6 +11,12 @@ export function useParticleSampler(
 ): ParticleData {
   const gltf = useGLTF(modelUrl);
 
+  // `colors` is commonly passed as an inline array literal by callers (see
+  // README usage example), which creates a new array identity every render.
+  // Depend on a stable string key derived from its contents instead, so a
+  // parent re-render doesn't trigger a full resample + GPU re-upload.
+  const colorsKey = colors.join(',');
+
   return useMemo(() => {
     const geometries: THREE.BufferGeometry[] = [];
 
@@ -27,7 +33,9 @@ export function useParticleSampler(
       const stripped = new THREE.BufferGeometry();
       stripped.setAttribute('position', geometry.getAttribute('position'));
       if (geometry.index) stripped.setIndex(geometry.index);
-      geometries.push(stripped);
+      // Normalize indexed-ness so mergeGeometries never sees a mix of
+      // indexed and non-indexed geometries, which would make it return null.
+      geometries.push(stripped.toNonIndexed());
     });
 
     if (geometries.length === 0) {
@@ -37,6 +45,13 @@ export function useParticleSampler(
     const merged =
       geometries.length === 1 ? geometries[0] : mergeGeometries(geometries, false);
 
+    if (!merged) {
+      throw new Error(
+        `useParticleSampler: failed to merge mesh geometries in ${modelUrl} (mismatched indexed/non-indexed meshes)`
+      );
+    }
+
     return sampleParticles(merged, { count: particleCount, colors });
-  }, [gltf, modelUrl, particleCount, colors]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gltf, modelUrl, particleCount, colorsKey]);
 }

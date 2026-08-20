@@ -5,7 +5,7 @@ export default function App() {
     <div style={{ width: '100vw', height: '100vh', background: '#050505' }}>
       <ParticleBrain
         modelUrl="/deadpool_funko_pop.glb"
-        className="h-full w-full"
+        style={{ width: '100%', height: '100%' }}
       />
     </div>
   );
