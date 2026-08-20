@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
-import { Canvas, useFrame } from '@react-three/fiber';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { useParticleSampler } from './useParticleSampler';
 import vertexShader from './shaders/particle.vert.glsl?raw';
 import fragmentShader from './shaders/particle.frag.glsl?raw';
@@ -10,6 +10,9 @@ export interface ParticleBrainProps {
   particleCount?: number;
   colors?: string[];
   particleSize?: number;
+  repelStrength?: number;
+  repelRadius?: number;
+  springBack?: number;
   autoRotate?: boolean;
   className?: string;
 }
@@ -21,6 +24,9 @@ function ParticleField({
   particleCount,
   colors,
   particleSize,
+  repelStrength,
+  repelRadius,
+  springBack,
   autoRotate,
 }: Required<Omit<ParticleBrainProps, 'className'>>) {
   const { positions, colors: particleColors, seeds } = useParticleSampler(
@@ -30,6 +36,10 @@ function ParticleField({
   );
 
   const groupRef = useRef<THREE.Group>(null);
+  const mouseInfluence = useRef(0);
+  const raycastPlane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 0, 1), 0), []);
+  const planeHit = useMemo(() => new THREE.Vector3(), []);
+  const { camera, pointer, raycaster } = useThree();
 
   const triangleGeometry = useMemo(() => {
     const geometry = new THREE.BufferGeometry();
@@ -48,10 +58,14 @@ function ParticleField({
         fragmentShader,
         uniforms: {
           uTime: { value: 0 },
+          uMouse: { value: new THREE.Vector3() },
+          uMouseInfluence: { value: 0 },
+          uRepelStrength: { value: repelStrength },
+          uRepelRadius: { value: repelRadius },
           uParticleSize: { value: particleSize },
         },
       }),
-    [particleSize]
+    [repelStrength, repelRadius, particleSize]
   );
 
   useEffect(() => {
@@ -63,6 +77,17 @@ function ParticleField({
 
   useFrame((state) => {
     material.uniforms.uTime.value = state.clock.elapsedTime;
+
+    raycaster.setFromCamera(pointer, camera);
+    const hit = raycaster.ray.intersectPlane(raycastPlane, planeHit);
+    const targetInfluence = hit ? 1 : 0;
+    if (hit) {
+      material.uniforms.uMouse.value.copy(planeHit);
+    }
+
+    mouseInfluence.current += (targetInfluence - mouseInfluence.current) * springBack;
+    material.uniforms.uMouseInfluence.value = mouseInfluence.current;
+
     if (autoRotate && groupRef.current) {
       groupRef.current.rotation.y += 0.0015;
     }
@@ -79,6 +104,9 @@ export function ParticleBrain({ className, ...props }: ParticleBrainProps) {
   const particleCount = props.particleCount ?? 8000;
   const colors = props.colors ?? DEFAULT_COLORS;
   const particleSize = props.particleSize ?? 0.02;
+  const repelStrength = props.repelStrength ?? 0.6;
+  const repelRadius = props.repelRadius ?? 1.2;
+  const springBack = props.springBack ?? 0.08;
   const autoRotate = props.autoRotate ?? true;
 
   return (
@@ -89,6 +117,9 @@ export function ParticleBrain({ className, ...props }: ParticleBrainProps) {
           particleCount={particleCount}
           colors={colors}
           particleSize={particleSize}
+          repelStrength={repelStrength}
+          repelRadius={repelRadius}
+          springBack={springBack}
           autoRotate={autoRotate}
         />
       </Canvas>
