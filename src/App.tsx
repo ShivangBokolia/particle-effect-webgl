@@ -6,6 +6,8 @@ export default function App() {
       <ParticleBrain
         modelUrl="/deadpool_funko_pop.glb"
         style={{ width: '100%', height: '100%' }}
+        autoRotate={false}
+        repelStrength={0.1}
       />
     </div>
   );
